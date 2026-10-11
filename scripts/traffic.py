@@ -34,7 +34,7 @@ def post(url: str, body: dict) -> int:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--url", default="http://localhost:8080/predict")
+    ap.add_argument("--url", default="http://127.0.0.1:8080/predict")
     ap.add_argument("--n", type=int, default=600)
     ap.add_argument("--shift", type=float, default=0.0, help="add this many degrees to temp_c")
     ap.add_argument("--bad-rate", type=float, default=0.02, help="share of malformed requests (4xx)")
