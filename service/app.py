@@ -16,7 +16,9 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
+
+from service import metrics
 
 from service.schemas import BatchRequest, BatchResponse, PredictRequest, PredictResponse
 
@@ -78,6 +80,8 @@ async def add_request_context(request: Request, call_next):
     started = time.perf_counter()
     response = await call_next(request)
     latency_ms = (time.perf_counter() - started) * 1000
+    if request.url.path != "/metrics":
+        metrics.observe(request.url.path, response.status_code, latency_ms / 1000)
     response.headers["x-request-id"] = request_id
     response.headers["x-model-version"] = str(STATE["version"])
     log.info(
@@ -119,11 +123,21 @@ def _score(rows: list[dict]) -> list[float]:
 
 @app.post("/predict", response_model=PredictResponse)
 def predict(payload: PredictRequest) -> PredictResponse:
-    score = _score([payload.model_dump()])[0]
+    row = payload.model_dump()
+    score = _score([row])[0]
+    metrics.record_inputs([row])
     return PredictResponse(probability=score, model_version=str(STATE["version"]))
 
 
 @app.post("/predict/batch", response_model=BatchResponse)
 def predict_batch(payload: BatchRequest) -> BatchResponse:
-    scores = _score([row.model_dump() for row in payload.rows])
+    rows = [row.model_dump() for row in payload.rows]
+    scores = _score(rows)
+    metrics.record_inputs(rows)
     return BatchResponse(probabilities=scores, model_version=str(STATE["version"]))
+
+
+@app.get("/metrics", response_class=PlainTextResponse)
+def prometheus_metrics() -> str:
+    """Lab 4: the five dashboard signals, scraped by Prometheus (monitoring/prometheus.yml)."""
+    return metrics.render(str(STATE["version"]))

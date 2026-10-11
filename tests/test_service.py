@@ -87,3 +87,15 @@ def test_batch_matches_singles(client):
 def test_batch_size_limit_enforced(client):
     r = client.post("/predict/batch", json={"rows": [VALID] * 101})
     assert r.status_code == 422
+
+
+def test_metrics_expose_the_five_dashboard_signals(client):
+    """Lab 4 Task 4: if one of these disappears, the dashboard panel silently goes blank."""
+    client.post("/predict", json=VALID)
+    client.post("/predict", json={**VALID, "surprise": 1})  # a 4xx, so the error split has data
+    text = client.get("/metrics").text
+    assert 'http_requests_total{route="/predict",status_class="2xx"}' in text
+    assert 'http_requests_total{route="/predict",status_class="4xx"}' in text
+    assert 'http_request_duration_seconds_bucket{route="/predict",le="0.2"}' in text
+    assert "model_version_info{version=" in text
+    assert 'feature_rolling_mean{feature="temp_c"}' in text

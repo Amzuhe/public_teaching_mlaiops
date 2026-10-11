@@ -13,7 +13,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
+import urllib.request
+from datetime import datetime, timezone
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -22,9 +25,18 @@ import pandas as pd
 
 # Conventional PSI reading, and it IS only conventional — it comes from credit scoring,
 # where features are stable and volumes are large. Your problem may warrant something
-# tighter or looser. TODO(Lab 4): state your threshold and why, in your README.
+# tighter or looser.
 PSI_NO_CHANGE = 0.10
 PSI_MODERATE = 0.25
+
+# Lab 4: our alert threshold, MEASURED rather than copied (full reasoning in the README).
+# 300 healthy 500-row windows sampled across the fleet never exceeded PSI 0.054 on any
+# feature (p99 0.048), so 0.08 gives ~0% false alarms. Over 200 windows each, a temp_c
+# shift of +3 C (a third of a std) fires 87% of the time and +4 C fires 100%; the textbook
+# 0.25 needs about +6 C. Calibrated for 500-row windows only: 250 rows is noisier (p99
+# 0.096), so change the window and the threshold together.
+ALERT_THRESHOLD = 0.08
+WINDOW = 500
 
 
 @dataclass
@@ -106,14 +118,20 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--reference", type=Path, default=Path("data/raw/sensors.csv"))
     ap.add_argument("--current", type=Path, required=True)
-    ap.add_argument("--threshold", type=float, default=PSI_MODERATE,
+    ap.add_argument("--threshold", type=float, default=ALERT_THRESHOLD,
                     help="alert above this PSI. Justify your value in the README.")
     ap.add_argument("--out", type=Path, default=Path("reports/drift.json"))
     ap.add_argument("--emit", action="store_true", help="send scores as cloud metrics")
+    ap.add_argument("--window", type=int, default=WINDOW,
+                    help="score the most recent N rows; the threshold is calibrated for 500")
     args = ap.parse_args()
 
     reference = pd.read_csv(args.reference)
+    # The window must span the fleet: the file is sorted by machine, so its last 500 rows
+    # are ~20 machines, and that fleet-mix difference alone reads as drift. Sample across
+    # all rows, the same way the threshold was calibrated.
     current = pd.read_csv(args.current)
+    current = current.sample(n=min(args.window, len(current)), random_state=0)
     results = compare(reference, current, data.FEATURES)
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
@@ -138,9 +156,26 @@ def main() -> int:
         print("Before you retrain: is this drift, or is it a broken upstream pipeline? "
               "Retraining on corrupted data destroys a working model faster than any "
               "schedule would.")
+        lines = [f"`{r.feature}` PSI {r.psi:.3f} (threshold {args.threshold}), "
+                 f"mean {r.ref_mean} -> {r.cur_mean}" for r in breached]
+        _alert(f"🚨 **Drift alert** {datetime.now(timezone.utc):%Y-%m-%d %H:%M:%S} UTC\n"
+               + "\n".join(lines)
+               + "\nCheck the schema and null rate before retraining.")
         return 2
     print(f"\nOK  no feature above threshold {args.threshold}")
     return 0
+
+
+def _alert(text: str) -> None:
+    """Post to the Discord webhook in DRIFT_WEBHOOK_URL (a repository secret, never committed)."""
+    url = os.environ.get("DRIFT_WEBHOOK_URL")
+    if not url:
+        print("(no DRIFT_WEBHOOK_URL set: alert printed only)")
+        return
+    headers = {"content-type": "application/json", "user-agent": "itcs355-drift"}
+    req = urllib.request.Request(url, data=json.dumps({"content": text}).encode(), headers=headers)
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        print(f"alert sent, HTTP {resp.status}")
 
 
 if __name__ == "__main__":

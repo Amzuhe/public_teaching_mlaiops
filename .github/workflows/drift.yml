@@ -1,0 +1,56 @@
+# ITCS355 Lab 4: scheduled drift detection.
+#
+# Every hour, score the latest production window (data/current.csv, the stand-in for the
+# production input log) against the training reference, and post to Discord on breach.
+# The webhook URL is the repository secret DRIFT_WEBHOOK_URL, never a committed file.
+#
+# Scheduler: GitHub Actions cron, in place of EventBridge / Azure ML / Cloud Scheduler
+# (no cloud account this lab; see README "What is not done"). GitHub may start a scheduled
+# run a few minutes late, so it also runs on every push that changes the window and on demand.
+
+name: Drift
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  push:
+    branches: [main]
+    paths: ["data/current.csv"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install
+        run: pip install -r requirements.txt
+
+      - name: Rebuild the training reference window
+        run: python scripts/make_dataset.py
+
+      - name: Score drift and alert
+        env:
+          DRIFT_WEBHOOK_URL: ${{ secrets.DRIFT_WEBHOOK_URL }}
+        # Exit code 2 means "drift found and alerted": record it, but keep the run green so
+        # a real breach is not mistaken for a broken pipeline.
+        run: |
+          set +e
+          python -m monitoring.drift --current data/current.csv
+          code=$?
+          echo "drift exit code: $code"
+          [ "$code" = 0 ] || [ "$code" = 2 ]
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: drift-report
+          path: reports/drift.json
