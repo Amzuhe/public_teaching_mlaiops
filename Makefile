@@ -41,7 +41,12 @@ image-push: image ## Push to CONTAINER_REGISTRY via your adapter
 	python -c "from src import config; from cloudlayer.factory import get_adapter; \
 	print(get_adapter(config.load()).push_image(\"$(IMAGE):$(TAG)\"))"
 
-reproduce: data image ## THE ONE COMMAND. Grader runs this.
+reproduce: image ## THE ONE COMMAND. Grader runs this. Needs only Docker.
+	# the container runs as non-root uid 10001; let it write the two mounted folders on any host
+	mkdir -p data/raw reports && chmod a+rwx data/raw reports
+	# data is generated INSIDE the image too: the grader may have Docker and no Python/numpy
+	docker run --rm -v "$$PWD/data:/app/data" --entrypoint python \
+	  $(IMAGE):$(TAG) scripts/make_dataset.py --seed $(SEED)
 	docker run --rm \
 	  -v "$$PWD/data:/app/data:ro" \
 	  -v "$$PWD/reports:/app/reports" \
