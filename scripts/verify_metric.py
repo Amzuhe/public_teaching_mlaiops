@@ -24,7 +24,7 @@ def main() -> int:
     if not METRICS.exists():
         print("FAIL  reports/metrics.json missing — run `make reproduce` first")
         return 1
-    match = CLAIM.search(README.read_text())
+    match = CLAIM.search(README.read_text(encoding="utf-8"))   # the claim has "±"; Windows' default codepage garbles it
     if not match:
         print("FAIL  README.md has no claim line.\n"
               "      Add one, exactly in this form:\n"
