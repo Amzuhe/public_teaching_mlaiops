@@ -33,6 +33,15 @@ def git_commit() -> str:
         return "unknown"
 
 
+def dvc_version(raw_path) -> str:
+    """md5 of the DVC-tracked data/raw (from data/raw.dvc): the data version the lab asks for."""
+    try:
+        import yaml
+        return yaml.safe_load(Path(raw_path).parent.with_suffix(".dvc").read_text())["outs"][0]["md5"]
+    except Exception:
+        return "untracked"
+
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="ITCS355 Lab 1 — reproducible training")
     p.add_argument("--n-estimators", type=int, default=200)
@@ -70,6 +79,7 @@ def main() -> None:
         mlflow.set_tags({
             "git_commit": git_commit(),
             "data_fingerprint": fingerprint,
+            "dvc_data_version": dvc_version(cfg.raw_path),
             "split_strategy": "group_by_machine_id",
             "n_train_rows": len(train_df),
             "n_val_rows": len(val_df),

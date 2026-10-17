@@ -1,13 +1,9 @@
 # ITCS355 Lab 1 — training image
 #
-# TODO(Lab 1, Task 2): pin this base image BY DIGEST, not by tag.
-#   Tags move. `python:3.11-slim` today is not `python:3.11-slim` next month, and a
-#   moving base is the commonest reason a "reproducible" build stops reproducing.
-#   Get the digest with:
-#       docker pull python:3.11-slim && docker inspect --format='{{index .RepoDigests 0}}' python:3.11-slim
-#   Then replace the two FROM lines below with the digest form:
-#       FROM python@sha256:<digest> AS builder
-FROM python:3.11-slim AS builder
+# Base image pinned BY DIGEST (Lab 1, Task 2): tags move, a digest can't. The tag stays for
+# humans; Docker uses the digest. Digest = the python:3.11-slim multi-arch index on 2026-10-17
+# (read from Docker Hub's registry API). To update: re-read the digest, rebuild, re-run make verify.
+FROM python:3.11-slim@sha256:e88e9763f943ec1834f992a4b51e0f24500486803e8bc534e5767af9ea65f6ce AS builder
 
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -17,12 +13,12 @@ WORKDIR /build
 
 # Dependencies first so this layer caches independently of your source.
 COPY requirements.txt ./
-# TODO(Lab 1, Task 2): once requirements.txt carries hashes, add --require-hashes here.
-# It turns a silently-substituted package into a build failure, which is what you want.
-RUN pip install --prefix=/install -r requirements.txt
+# --require-hashes (Lab 1, Task 2): requirements.txt is a hashed lock (uv pip compile, linux/py3.11),
+# so a silently-substituted package becomes a build failure instead of a different model.
+RUN pip install --prefix=/install --require-hashes -r requirements.txt
 
 
-FROM python:3.11-slim AS runtime
+FROM python:3.11-slim@sha256:e88e9763f943ec1834f992a4b51e0f24500486803e8bc534e5767af9ea65f6ce AS runtime
 
 # Non-root. A training container has no reason to run as root, and graders check.
 RUN useradd --create-home --uid 10001 runner

@@ -117,21 +117,27 @@ different seeds.
 
 ## Reproducibility trade-off
 
-**REPLACE with your answer, 100 words maximum.**
-
-Three things pin your build: hashed dependencies, a digest-pinned base image, and controlled
-seeds. Under real time pressure you would keep some and drop others.
-
-Which would you drop first, and what specifically breaks when you do? There is a defensible
-answer, and we compare answers in Session 2. An answer that refuses to choose scores zero.
+**I would drop the base-image digest first.** What breaks: `python:3.11-slim` drifts through
+patch releases (security fixes, 3.11.x bug fixes), so the OS and interpreter under the model
+change. Those rarely move a scikit-learn metric, and if one did, `make verify` would catch it —
+the unpinned tag even brings in security fixes. I keep the hashed lock: a swapped package file
+changes the build silently. I keep the seed: it costs one line, and without it the split and
+trees change every run, moving the metric far beyond the ±0.001 tolerance.
 
 ---
 
 ## Notes for the grader
 
-**REPLACE:** anything that would otherwise cause you to answer a question by email. Non-obvious
-choices, known limitations, anything that behaves differently on your machine. A README that
-requires a conversation has failed the lab regardless of what the code does.
+- **You do not need cloud access to reproduce.** `make reproduce` regenerates the dataset
+  deterministically (`make data`, fixed seed) and trains in Docker; no credentials, no `dvc pull`.
+  The DVC remote (Azure Blob, private) holds the same `data/raw` for provenance: version
+  `1c886b512c8a5c9bf723da1cd119fc80.dir`, logged on every run as the `dvc_data_version` tag.
+- **Cloud:** Azure for Students. Its policy only allows koreacentral / malaysiawest /
+  indonesiacentral / centralindia / indiasouthcentral, so storage and ACR live in **malaysiawest**,
+  not southeastasia.
+- **Lock file** was compiled for the image's target (linux/amd64, Python 3.11) with
+  `uv pip compile --generate-hashes`, so it resolves the same on any host OS.
+- Developed on Windows; the image builds with `--platform linux/amd64`.
 
 ---
 

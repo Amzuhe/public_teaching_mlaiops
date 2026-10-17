@@ -16,18 +16,60 @@ Hints for Lab 1:
 """
 from __future__ import annotations
 
+import os
+import shutil
+import subprocess
+from urllib.parse import urlparse
+
 from cloudlayer.base import CloudAdapter
 
 
+def _run(*cmd: str) -> str:
+    # shutil.which resolves az -> az.cmd on Windows; a bare "az" can't be launched without a shell there
+    exe = shutil.which(cmd[0]) or cmd[0]
+    return subprocess.run([exe, *cmd[1:]], check=True, capture_output=True, text=True).stdout.strip()
+
+
 class AzureAdapter(CloudAdapter):
+    def _blob(self, uri: str):
+        """BlobClient for https://<account>.blob.core.windows.net/<container>/<blob path>.
+        The account is the hostname, the container is the FIRST path segment (the classic swap)."""
+        from azure.identity import DefaultAzureCredential
+        from azure.storage.blob import BlobClient
+        u = urlparse(uri)
+        container, _, blob = u.path.lstrip("/").partition("/")
+        if u.scheme != "https" or not u.netloc.endswith(".blob.core.windows.net") or not blob:
+            raise ValueError(f"not an https Azure blob URI with a container and a path: {uri}")
+        # credential chain, not a connection string: az login locally, managed identity in CI
+        return BlobClient(f"https://{u.netloc}", container, blob, credential=DefaultAzureCredential())
+
     def upload(self, local_path: str, key: str) -> str:
-        raise NotImplementedError("TODO Lab 1: upload_blob into BLOB_URI, return the full URI")
+        uri = f"{self.cfg.blob_uri.rstrip('/')}/{key.lstrip('/')}"
+        with open(local_path, "rb") as f:
+            self._blob(uri).upload_blob(f, overwrite=True)
+        return uri
 
     def download(self, uri: str, local_path: str) -> None:
-        raise NotImplementedError("TODO Lab 1: download_blob, creating parent directories")
+        os.makedirs(os.path.dirname(local_path) or ".", exist_ok=True)
+        with open(local_path, "wb") as f:
+            f.write(self._blob(uri).download_blob().readall())
+
 
     def push_image(self, local_tag: str) -> str:
-        raise NotImplementedError("TODO Lab 1: az acr login, push, return registry/repo@sha256:...")
+        """Tag + push to CONTAINER_REGISTRY; return registry/repo@sha256:... (a tag can be moved
+        to other bytes, a digest can't - so 'which code is serving?' has one answer)."""
+        registry = self.cfg.container_registry.rstrip("/")          # itcs355<id>.azurecr.io/itcs355
+        name, _, tag = local_tag.partition(":")
+        remote = f"{registry}/{name.rsplit('/', 1)[-1]}:{tag or 'latest'}"
+        _run("az", "acr", "login", "--name", registry.split(".", 1)[0])   # lets docker push
+        _run("docker", "tag", local_tag, remote)
+        _run("docker", "push", remote)
+        digests = _run("docker", "inspect", "--format", "{{json .RepoDigests}}", remote)
+        repo = remote.rsplit(":", 1)[0]
+        ref = next((d for d in digests.strip("[]").replace('"', "").split(",") if d.startswith(repo + "@")), "")
+        if not ref:
+            raise RuntimeError(f"pushed {remote} but found no digest for it in {digests}")
+        return ref
 
     # submit_training / register_model  -> Lab 2 (Azure ML command job + model registry)
     # deploy / invoke                   -> Lab 3. On Azure for Students, deploy to
