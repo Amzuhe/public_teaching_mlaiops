@@ -432,6 +432,30 @@ whether or not anything is pushed — the exact risk the estimate named. The Lab
 gap can only be read once billing catches up (about a day), so sections 2–6 of
 `reports/lab5-cost.md` are not final.
 
+## Task 6 — Teardown (first half, 2026-10-23 22:23)
+
+Deleted every resource created for Lab 5 (tag `lab=5`): the three managed identities.
+
+```bash
+az identity delete -g itcs355-6688003 -n id-itcs355-train   # and -serve, -ci
+az resource list --tag lab=5 --query "length(@)"             # -> 0
+```
+
+**What the check found:** deleting an identity does **not** delete its role assignments. Three
+orphaned assignments (Blob Data Contributor, Blob Data Reader, AcrPush) were still there, pointing
+at principals that no longer exist. They were found with
+`az role assignment list --all --query "[?principalType!='User' && principalName=='']"` and deleted;
+the same query now returns 0. A teardown that only deletes resources reports success and leaves
+these behind — the "teardown fails silently" case.
+
+**Kept on purpose:** the storage account and the container registry (`course=itcs355`, tagged
+`lab=1`). Storage holds the Lab 1 DVC data the grader's reproduce run relies on, and Labs 2–3 reuse
+both. They are deleted with the whole resource group at term end
+(`az group delete --name itcs355-6688003`), because the registry bills ~6 THB a day.
+
+**Still to do:** the portal screenshot of the empty Lab 5 resource list, and the 24-hour re-check
+of billing.
+
 ## Part B — the LLM step (Tasks 7–9)
 
 **The step:** a maintenance-triage assistant on top of the failure classifier. It gets one
@@ -518,4 +542,4 @@ rationale is limited to two sentences.
 | Managed pipeline on Azure ML | No workspace yet; the DAG runs locally with the real gate |
 | Task 2 on the managed identities themselves | They can only be used from Azure compute; the test above uses the developer identity |
 | Task 4B/4C second-provider adapter | `generate` now works on the GCP adapter (Gemini), but `upload`/`download`/`invoke` need a GCP project with billing, which I have not created |
-| Task 5 actual vs estimate, Task 6 teardown + 24 h check | Billing lags a day; teardown would also delete what Labs 2–3 still need |
+| Task 5 actual vs estimate, Task 6 screenshot + 24 h check | Billing lags a day; Lab 5 resources are deleted, the screenshot and re-check follow |
