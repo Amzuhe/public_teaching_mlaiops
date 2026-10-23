@@ -1,0 +1,14 @@
+[ingest] $ scripts/make_dataset.py
+wrote data\raw\sensors.csv  rows=6000  machines=240  positive_rate=0.117
+[validate] $ -m pytest -q tests/test_data.py
+..........                                                               [100%]
+10 passed in 0.65s
+[train] $ -m src.train --metrics-out C:\Users\user\Desktop\ITCS355\reports\pipeline_outputs/metrics.json
+[evaluate] $ scripts/evaluation_gate.py --metrics C:\Users\user\Desktop\ITCS355\reports\pipeline_outputs/metrics.json
+candidate test_roc_auc = 0.8482
+incumbent 0.8482  delta +0.0000  required +0.0100
+GATE FAIL  improvement within noise; not registering
+[evaluate] gate_decision = fail
+[register] SKIPPED (gate_decision = fail)
+[deploy_staging] SKIPPED (upstream did not succeed)
+summary: ingest=ok, validate=ok, train=ok, evaluate=ok, register=skipped, deploy_staging=skipped

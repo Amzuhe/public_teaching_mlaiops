@@ -27,3 +27,5 @@ __pycache__/
 # Instructor material lives in the private teaching repository. If this path ever
 # reappears here it is a mistake, not a convenience.
 instructor/
+reports/pipeline_outputs/
+reports/permtest.txt

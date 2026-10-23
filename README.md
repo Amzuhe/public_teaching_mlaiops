@@ -302,3 +302,104 @@ schedule runs on GitHub Actions cron.
 
 **Teardown:** nothing runs in a cloud. Locally: `docker compose -f monitoring/docker-compose.yml down`
 and stop the uvicorn process. The scheduled drift workflow can be disabled from the Actions tab.
+
+---
+
+# Lab 5 — Cloud MLOps and cost (partial, 2026-10-23)
+
+**Status:** submitted partial on the due date; an extension was requested because of a family
+medical emergency. Labs 2 and 3, which Lab 5 builds on, are still open. Everything below was
+actually run; the "not done" list at the end is exact.
+
+## Task 1 — Pipeline with a gate that can fail
+
+`pipeline/pipeline.yaml` is the DAG. `scripts/run_pipeline.py` runs it step by step and obeys
+its rules: `validate` failing aborts the run, `register` only runs when `evaluate` passed, and
+a skipped step skips everything after it.
+
+```bash
+python scripts/run_pipeline.py
+```
+
+**The gate** (`scripts/evaluation_gate.py`) compares the candidate with the model the registry
+currently calls `production` (MLflow alias), not with a number typed by hand.
+
+| Threshold | Value | Why |
+|---|---|---|
+| `MIN_ABSOLUTE` | 0.80 test ROC-AUC | Over 6 seeds the metric was 0.847 mean, 0.017 SD (`reports/noise/`). 0.80 ≈ mean − 3 SD: below it the model is broken, not unlucky. |
+| `MIN_IMPROVEMENT` | +0.01 | The scaffold's 0.002 was about 1/8 of the seed noise, so luck alone would pass it. 0.01 ≈ 0.6 SD. |
+
+**Evidence the fail branch is reachable:** run 1 registered v1 (empty registry). Run 2 retrained
+the same model; the gate saw delta +0.0000 against the required +0.0100, refused, and `register`
+and `deploy_staging` were skipped: `reports/lab5-pipeline-run2-gate-fail.txt`.
+
+**Honest limits:** the steps run on this machine, not as containers on managed compute. An Azure
+ML workspace was not set up in time, so `cloudlayer/pipelines.compile_azure` is still a TODO.
+`scripts/deploy.py` only moves the registry's `staging` alias, because the Lab 3 serving image
+does not exist yet.
+
+## Task 2 — Least privilege
+
+Three user-assigned managed identities, tagged `course=itcs355`, in `itcs355-6688003`:
+
+| Identity | Role | Scope | Why it needs it |
+|---|---|---|---|
+| `id-itcs355-train` | Storage Blob Data Contributor | the `itcs355` container only | read the dataset, write the model and metrics |
+| `id-itcs355-serve` | Storage Blob Data Reader | the `itcs355` container only | read the model artifact; it must never overwrite it |
+| `id-itcs355-ci` | AcrPush | the container registry only | push images; it has no access to data |
+
+Scoped to the container, not the storage account or subscription, so a leaked training identity
+cannot touch anything else.
+
+**Removing a permission (the assessed part):**
+_In progress: the developer identity's Storage Blob Data Contributor role is removed, an upload is retried through the adapter, and the role is restored. Result recorded below when done._
+
+## Task 3 — What should trigger a retrain?
+
+The system predicts machine failures from sensor readings (temperature, vibration, etc.).
+
+| Strategy | When it is right for this system | How it fails here |
+|---|---|---|
+| Fixed schedule (weekly, Sun 02:00) | The fleet changes slowly (seasons, wear), so a weekly refresh keeps up, and it is predictable to budget. | It retrains on whatever arrived, including a broken sensor feed, and it misses a sudden change (new machine model) for up to a week. |
+| Data volume threshold | New failure labels are rare (~12% positives); retraining once enough new failures arrive means each retrain actually has something new to learn. | Failures can be quiet for weeks, so the model goes stale while waiting; a burst of mislabeled rows triggers a retrain early. |
+| Drift-triggered | Reacts within hours to a real change in the fleet. | Lab 4's injected +6 °C offset was a **sensor fault, not a real change**. Drift-triggered retraining would have learned the fault as normal and replaced a working model within hours — faster damage than any schedule. |
+
+**Chosen:** a fixed weekly schedule (`0 2 * * 0`, a quiet hour), always behind the data contract
+tests and the evaluation gate, with drift used as an **alert to a human**, not as a trigger.
+**Worst case:** a slowly corrupting sensor passes the contracts, the gate compares against a
+production model scored on clean data, and a slightly worse model is refused — so the worst
+case is a week of a stale model, not a broken one.
+
+## Task 4 — Portability
+
+**Part A, audit:** `python scripts/portability_audit.py` →
+`PORTABILITY AUDIT PASSED — src, service, monitoring, tests contain no provider-specific strings`.
+
+Parts B and C are not done (see below).
+
+## Task 5 — Cost
+
+1. **Estimate before running:** `reports/lab5-cost-estimate.md`, committed before any Lab 5 run (~46 THB for the week).
+2. **Actual so far**, from Azure Cost Management filtered by tag `course=itcs355`, 1–23 Oct:
+
+| Component | USD | THB (×36) |
+|---|---|---|
+| Container Registry | 0.990 | 35.6 |
+| Storage | 0.000004 | 0.0 |
+| Bandwidth | 0.000 | 0.0 |
+| **Total term spend** | **0.99** | **35.6** |
+
+The term spend is under the 800 THB limit. Almost all of it is the registry, billed per day
+whether or not anything is pushed — the exact risk the estimate named. The Lab 5 actual and the
+gap can only be read once billing catches up (about a day), so sections 2–6 of
+`reports/lab5-cost.md` are not final.
+
+## What is not done (and why)
+
+| Item | Why |
+|---|---|
+| Managed pipeline on Azure ML | No workspace yet; the DAG runs locally with the real gate |
+| Task 2 on the managed identities themselves | They can only be used from Azure compute; the test above uses the developer identity |
+| Task 4B/4C second-provider adapter | Needs an AWS or GCP account, which I have not created yet |
+| Task 5 actual vs estimate, Task 6 teardown + 24 h check | Billing lags a day; teardown would also delete what Labs 2–3 still need |
+| Tasks 7–9 (LLM golden set, guardrail, token bill) | Needs a real LLM API: token counts must come from the provider, not be estimated |

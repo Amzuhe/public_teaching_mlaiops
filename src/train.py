@@ -115,8 +115,10 @@ def main() -> None:
         print(json.dumps({"seed": seed, "data_fingerprint": fingerprint, **metrics}, indent=2))
         if args.metrics_out:
             args.metrics_out.parent.mkdir(parents=True, exist_ok=True)
+            # run_id lets the pipeline's register step find this exact model (Lab 5)
             args.metrics_out.write_text(json.dumps(
-                {"seed": seed, "data_fingerprint": fingerprint, **metrics}, indent=2))
+                {"seed": seed, "data_fingerprint": fingerprint,
+                 "run_id": mlflow.active_run().info.run_id, **metrics}, indent=2))
 
 
 if __name__ == "__main__":

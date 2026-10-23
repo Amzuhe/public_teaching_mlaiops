@@ -15,10 +15,30 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-# TODO(Lab 5): choose and defend these. A margin of zero means noise gets promoted;
-# too large a margin means real improvements never ship.
-MIN_ABSOLUTE = 0.75
-MIN_IMPROVEMENT = 0.002
+# Measured 2026-10-23: test ROC-AUC over 6 seeds = 0.847 mean, 0.017 SD (reports/noise/).
+# MIN_ABSOLUTE ~ mean - 3 SD: below it the model is broken, not unlucky.
+# MIN_IMPROVEMENT ~ 0.6 SD: the old 0.002 was ~1/8 of the seed noise, so luck alone would
+# pass it. 0.01 still lets a real gain ship without waiting for a full 1-SD jump.
+MIN_ABSOLUTE = 0.80
+MIN_IMPROVEMENT = 0.01
+ALIAS = "production"
+
+
+def registry_incumbent(metric: str) -> float | None:
+    """The metric of the model currently aliased 'production', or None on a first run."""
+    import mlflow
+    from mlflow.exceptions import MlflowException
+
+    from src import config
+
+    cfg = config.load(strict=False)
+    mlflow.set_tracking_uri(cfg.mlflow_tracking_uri)
+    client = mlflow.MlflowClient()
+    try:
+        mv = client.get_model_version_by_alias(cfg.model_registry_name, ALIAS)
+    except MlflowException:
+        return None  # no registered model or no production alias yet: legitimately none
+    return float(client.get_run(mv.run_id).data.metrics[metric])
 
 
 def main() -> int:
@@ -39,9 +59,9 @@ def main() -> int:
 
     incumbent = args.incumbent
     if incumbent is None:
-        # TODO(Lab 5): read the production version's metric from the registry instead of
-        # assuming there is no incumbent. A first run legitimately has none.
-        print("no incumbent supplied — treating as first registration")
+        incumbent = registry_incumbent(args.metric)
+    if incumbent is None:
+        print("no production model in the registry — first registration")
         print("GATE PASS")
         return 0
 
