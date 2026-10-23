@@ -181,11 +181,23 @@ def main() -> int:
     ap.add_argument("--out", type=Path, default=ROOT / "reports" / "llm_eval.json")
     ap.add_argument("--baseline", type=Path,
                     help="a previous report; fail if any case regresses against it")
+    ap.add_argument("--system", type=Path, help="--live: system prompt file")
+    ap.add_argument("--max-output-tokens", type=int, default=200)
+    ap.add_argument("--temperature", type=float, default=0.0)
+    ap.add_argument("--record", type=Path,
+                    help="--live: save the responses as a fixture so the run can be replayed offline")
     args = ap.parse_args()
 
     golden = read_jsonl(args.golden)
     if args.live:
-        responses = generate_live(golden)
+        params = {"model": args.model, "max_output_tokens": args.max_output_tokens,
+                  "temperature": args.temperature, "json": True,
+                  "system": args.system.read_text(encoding="utf-8") if args.system else None}
+        responses = generate_live(golden, args.provider, params)
+        if args.record:
+            args.record.parent.mkdir(parents=True, exist_ok=True)
+            args.record.write_text("".join(json.dumps(r) + "\n" for r in responses))
+            print(f"recorded {shown(args.record)}")
     else:
         responses = read_jsonl(args.responses)
 
@@ -212,21 +224,24 @@ def main() -> int:
     return 0
 
 
-def generate_live(golden: list[dict]) -> list[dict]:
-    """TODO(Lab 5): route each prompt through your adapter's `generate`.
+def generate_live(golden: list[dict], provider: str, params: dict) -> list[dict]:
+    """Route each prompt through the adapter's `generate`.
 
-    Record input_tokens, output_tokens and latency_ms from the provider's own usage
-    fields — do not estimate them by counting words. Every provider tokenises
-    differently, and an estimated token count in a cost report is a fabricated number.
+    input_tokens, output_tokens and latency_ms come from the provider's own usage fields
+    (the adapter reads them); nothing here counts words.
     """
-    from src import config
-    from cloudlayer.factory import get_adapter
+    from dataclasses import replace
 
-    adapter = get_adapter(config.load())
+    from cloudlayer.factory import get_adapter
+    from src import config
+
+    # the LLM provider can differ from the storage provider (Gemini here, Azure for storage)
+    adapter = get_adapter(replace(config.load(strict=False), provider=provider))
     rows = []
     for case in golden:
-        result = adapter.generate(case["prompt"], {"max_output_tokens": 200})
+        result = adapter.generate(case["prompt"], params)
         rows.append({"id": case["id"], **result})
+        print(f"  {case['id']}: {result['input_tokens']} in / {result['output_tokens']} out tokens")
     return rows
 
 

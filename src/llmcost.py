@@ -44,6 +44,11 @@ TOKEN_PRICE_TABLE: dict[str, dict[str, tuple[float, float]]] = {
         "small": (8.5, 34.0),
         "medium": (105.0, 525.0),
         "large": (525.0, 2625.0),
+        # Lab 5: the model actually used. Paid-tier list price $0.30 in / $2.50 out per 1M
+        # (output includes thinking tokens) x 36 THB/USD, checked 2026-10-23 on the provider's
+        # pricing page. Our runs were on the free tier, so the real bill was 0 THB.
+        # (gemini-2.5-flash-lite was cheaper but is closed to new users.)
+        "gemini-3.5-flash-lite": (10.8, 90.0),
     },
 }
 

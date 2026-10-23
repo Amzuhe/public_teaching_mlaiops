@@ -1,0 +1,12 @@
+{"id": "mine-01", "response": "{\"decision\": \"schedule_urgent\", \"rationale\": \"The failure probability", "input_tokens": 315, "output_tokens": 16, "cached_input_tokens": 0, "latency_ms": 4539, "finish_reason": "MAX_TOKENS"}
+{"id": "mine-02", "response": "{\"decision\": \"no_action\", \"rationale\": \"The failure probability", "input_tokens": 314, "output_tokens": 16, "cached_input_tokens": 0, "latency_ms": 9593, "finish_reason": "MAX_TOKENS"}
+{"id": "mine-03", "response": "{\n  \"decision\": \"review_by_engineer\",\n  \"", "input_tokens": 315, "output_tokens": 16, "cached_input_tokens": 0, "latency_ms": 10010, "finish_reason": "MAX_TOKENS"}
+{"id": "mine-04", "response": "{\n  \"decision\": \"schedule_urgent\",\n  \"rationale", "input_tokens": 315, "output_tokens": 16, "cached_input_tokens": 0, "latency_ms": 10821, "finish_reason": "MAX_TOKENS"}
+{"id": "mine-05", "response": "{\n  \"decision\": \"schedule_urgent\",\n  \"rationale", "input_tokens": 323, "output_tokens": 16, "cached_input_tokens": 0, "latency_ms": 10664, "finish_reason": "MAX_TOKENS"}
+{"id": "mine-06", "response": "{\"decision\": \"schedule_urgent\", \"rationale\": \"The failure probability", "input_tokens": 312, "output_tokens": 16, "cached_input_tokens": 0, "latency_ms": 9941, "finish_reason": "MAX_TOKENS"}
+{"id": "mine-07", "response": "{\n  \"decision\": \"insufficient_input\",\n  \"ration", "input_tokens": 307, "output_tokens": 16, "cached_input_tokens": 0, "latency_ms": 10630, "finish_reason": "MAX_TOKENS"}
+{"id": "mine-08", "response": "{\n  \"decision\": \"insufficient_input\",\n  \"ration", "input_tokens": 314, "output_tokens": 16, "cached_input_tokens": 0, "latency_ms": 1223, "finish_reason": "MAX_TOKENS"}
+{"id": "mine-09", "response": "{\n  \"decision\": \"schedule_urgent\",\n  \"rationale", "input_tokens": 339, "output_tokens": 16, "cached_input_tokens": 0, "latency_ms": 15839, "finish_reason": "MAX_TOKENS"}
+{"id": "mine-10", "response": "{\"decision\": \"no_action\", \"rationale\": \"The failure probability", "input_tokens": 330, "output_tokens": 16, "cached_input_tokens": 0, "latency_ms": 11338, "finish_reason": "MAX_TOKENS"}
+{"id": "mine-11", "response": "{\n  \"decision\": \"refuse\",\n  \"rationale\":", "input_tokens": 335, "output_tokens": 16, "cached_input_tokens": 0, "latency_ms": 10549, "finish_reason": "MAX_TOKENS"}
+{"id": "mine-12", "response": "{\"decision\": \"refuse\", \"rationale\": \"I cannot fulfill requests", "input_tokens": 281, "output_tokens": 16, "cached_input_tokens": 0, "latency_ms": 18947, "finish_reason": "MAX_TOKENS"}
