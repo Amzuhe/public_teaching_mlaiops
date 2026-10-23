@@ -406,6 +406,27 @@ Parts B and C are not done (see below).
 | Bandwidth | 0.000 | 0.0 |
 | **Total term spend** | **0.99** | **35.6** |
 
+**Cost per 1,000 predictions** (section 5). Throughput was measured on the Lab 3 service run
+locally (`loadtest/simple_load.py`, 10 users, 20 s): **49.2 req/s**, 0 errors, p50 204 ms, p95
+255 ms; 1 user: 27.1 req/s, p95 52 ms. A laptop is not a `Standard_B2s`, so treat the throughput as
+an upper bound until it is re-measured in the cloud.
+
+| Utilisation | `Standard_B2s` (can run) | `Standard_DS3_v2` (would choose, cannot run) |
+|---|---|---|
+| 5% | 0.169 THB | 0.915 THB |
+| 25% | 0.034 THB | 0.183 THB |
+| 80% | 0.011 THB | 0.057 THB |
+
+The number I believe is the **5%** one: this service gets a few requests a minute, not a
+sustained load. "The instance I would choose is not one I can run": the student subscription caps
+regional vCPU at 3, so the 4-vCPU `DS3_v2` is out, and so is any Azure ML managed endpoint.
+
+**The finding that matters:** a `B2s` kept on all month costs 1.50 × 24 × 30 = **1,080 THB**, more
+than the whole 800 THB term budget, for a service that is idle 95% of the time. Batch scoring beats
+an always-on endpoint below about **0.0004 req/s** (`batch_breakeven_rps`). So serving must
+**scale to zero** (Container Apps with `minReplicas: 0`), which is the optimisation planned for
+section 6. It is not applied yet, because the Lab 3 serving image is not built.
+
 The term spend is under the 800 THB limit. Almost all of it is the registry, billed per day
 whether or not anything is pushed — the exact risk the estimate named. The Lab 5 actual and the
 gap can only be read once billing catches up (about a day), so sections 2–6 of
