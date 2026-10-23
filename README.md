@@ -358,8 +358,8 @@ adapter with `python reports/permtest.py`:
 
 | Time (local) | Action | Result |
 |---|---|---|
-| 20:31 | role removed | uploads **still OK** twice: role changes are not instant |
-| 20:33 | retry | `UPLOAD FAILED: HttpResponseError AuthorizationPermissionMismatch` |
+| ~20:31 (approx.) | role removed | uploads **still OK** twice: role changes are not instant |
+| ~20:33 (approx.) | retry | `UPLOAD FAILED: HttpResponseError AuthorizationPermissionMismatch` |
 | 20:33:51 | role restored | uploads still failed for ~1.5 min |
 | 20:35:23 | retry | `UPLOAD OK` |
 
