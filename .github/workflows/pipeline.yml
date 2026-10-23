@@ -1,0 +1,56 @@
+# ITCS355 Lab 5: scheduled retraining.
+#
+# Runs pipeline/pipeline.yaml (ingest -> validate -> train -> evaluate -> register -> deploy)
+# every Sunday 02:00 Bangkok time (Saturday 19:00 UTC), the schedule pipeline.yaml declares.
+# The trigger choice is argued in README "Lab 5 / Task 3".
+#
+# The MLflow registry (mlflow.db + mlruns/) is carried between runs with the Actions cache,
+# so each run's gate compares against the model the previous run registered.
+# shortcut: Actions cache entries expire after 7 days unused; a weekly run keeps it alive, but
+# a real setup would keep the registry in the cloud (Lab 2).
+
+name: Pipeline
+
+on:
+  schedule:
+    - cron: "0 19 * * 6"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install
+        run: pip install -r requirements.txt
+
+      - name: Restore the model registry from the previous run
+        uses: actions/cache@v4
+        with:
+          path: |
+            mlflow.db
+            mlruns
+          key: registry-${{ github.run_id }}
+          restore-keys: registry-
+
+      # Exit 0 = ran to the end (the gate may still have refused to register: read the log).
+      # Exit 1 = a step failed or the data contract aborted the run.
+      - name: Run the pipeline
+        env:
+          MLFLOW_DISABLE_AGENT_HINT: "1"
+        run: python scripts/run_pipeline.py | tee reports/pipeline-run.txt
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: pipeline-run
+          path: reports/pipeline-run.txt
