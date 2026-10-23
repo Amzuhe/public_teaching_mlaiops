@@ -307,8 +307,7 @@ and stop the uvicorn process. The scheduled drift workflow can be disabled from 
 
 # Lab 5 — Cloud MLOps and cost (partial, 2026-10-23)
 
-**Status:** submitted partial on the due date; an extension was requested because of a family
-medical emergency. Labs 2 and 3, which Lab 5 builds on, are still open. Everything below was
+**Status:** partial. Labs 2 and 3, which Lab 5 builds on, are still open. Everything below was
 actually run; the "not done" list at the end is exact.
 
 ## Task 1 — Pipeline with a gate that can fail
