@@ -352,7 +352,25 @@ Scoped to the container, not the storage account or subscription, so a leaked tr
 cannot touch anything else.
 
 **Removing a permission (the assessed part):**
-_In progress: the developer identity's Storage Blob Data Contributor role is removed, an upload is retried through the adapter, and the role is restored. Result recorded below when done._
+Removed `Storage Blob Data Contributor` from the developer identity (the one the adapter
+actually authenticates as via `DefaultAzureCredential`), then retried an upload through the
+adapter with `python reports/permtest.py`:
+
+| Time (local) | Action | Result |
+|---|---|---|
+| 20:31 | role removed | uploads **still OK** twice: role changes are not instant |
+| 20:33 | retry | `UPLOAD FAILED: HttpResponseError AuthorizationPermissionMismatch` |
+| 20:33:51 | role restored | uploads still failed for ~1.5 min |
+| 20:35:23 | retry | `UPLOAD OK` |
+
+What this showed:
+1. **Owner of the subscription is not enough to write data.** Owner is a *control-plane* role
+   (manage resources); reading and writing blobs is *data-plane* and needs its own role. So the
+   data role is necessary, and the identity that only needs to read (serving) gets Reader.
+2. **Permission changes take 1–2 minutes to apply, in both directions.** Revoking access is not
+   instant, so in an incident you cannot assume a leaked identity stops working the moment you
+   remove its role; and a pipeline step scheduled right after a role grant can fail for no
+   visible reason.
 
 ## Task 3 — What should trigger a retrain?
 
